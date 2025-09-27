@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import requests
+import cloudscraper
+import json
 
 app = FastAPI(title="Thomas Cook RateCards Proxy API")
 
@@ -115,60 +117,52 @@ def get_bookmyforex_ratecard(city_code: str = "DEL"):
     except requests.RequestException as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     
-# import time
-# from selenium.webdriver.common.by import By
-# import undetected_chromedriver as uc
-
-# @app.get("/orientexchange/live-rates")
-# def get_orientexchange_live_rates():
-#     """
-#     Fetch live exchange rates from Orient Exchange dynamically using Selenium.
-#     Returns a JSON response with the live rates.
-#     """
-#     try:
-#         # Configure Chrome options
-#         options = uc.ChromeOptions()
-#         options.headless = True  # run in headless mode
-#         options.add_argument("--no-sandbox")
-#         options.add_argument("--disable-gpu")
-#         options.add_argument("--disable-dev-shm-usage")
+def map_rate_card_to_oreichange(data):
+    mapped_data = []
+    
+    for item in data:
+        currency_code = item.get("ccode")
+        currency_name = item.get("cname")
         
-#         # Launch browser
-#         driver = uc.Chrome(options=options)
-#         driver.get("https://www.orientexchange.in/")
-#         time.sleep(5)  # wait for page and JS to load
+        # Buy entry using 'bcn'
+        if item.get("buy"):
+            mapped_data.append({
+                "platform": "orientexchange",
+                "currencycode": currency_code,
+                "currencyname": currency_name,
+                "moduletype": "buy",
+                "productname": "",
+                "roe": item.get('buy')
+            })
+        
+        # Sell entry using 'scn'
+        if item.get("buy"):
+            mapped_data.append({
+                "platform": "orientexchange",
+                "currencycode": currency_code,
+                "currencyname": currency_name,
+                "moduletype": "sell",
+                "productname": "",
+                "roe": item.get('sell')
+            })
+    
+    return mapped_data
 
-#         # Select the location dropdown (if necessary)
-#         # Example: select Delhi (value=5)
-#         sel = driver.find_element(By.ID, "selLoc")
-#         for option in sel.find_elements(By.TAG_NAME, "option"):
-#             if option.text.strip() == "Delhi":
-#                 option.click()
-#                 time.sleep(2)
-
-#         # Click "Get Live Rates" button
-#         button = driver.find_element(By.ID, "getLiveRates")  # replace with actual button ID
-#         button.click()
-#         time.sleep(5)  # wait for rates to load
-
-#         # Extract rates table
-#         table = driver.find_element(By.ID, "liveRatesTable")  # replace with actual table ID
-#         rows = table.find_elements(By.TAG_NAME, "tr")
-
-#         result = []
-#         for row in rows[1:]:  # skip header
-#             cols = row.find_elements(By.TAG_NAME, "td")
-#             if len(cols) >= 5:
-#                 result.append({
-#                     "currency": cols[0].text.strip(),
-#                     "buy_rate": cols[1].text.strip(),
-#                     "sell_rate": cols[2].text.strip(),
-#                     "remit_rate": cols[3].text.strip(),
-#                     "notes": cols[4].text.strip(),
-#                 })
-
-#         driver.quit()
-#         return JSONResponse(content={"platform": "orientexchange", "rates": result})
-
-#     except Exception as e:
-#         return JSONResponse(content={"error": str(e)}, status_code=500)
+@app.get("/orientexchange/live-rates")
+def get_orientexchange_live_rates():
+    """
+    Fetch live exchange rates from Orient Exchange using cloudscraper.
+    Returns a JSON response with currency rates.
+    """
+    try:
+        scraper = cloudscraper.create_scraper()
+        data = {'selLoc': '5', 'requestType': 'getLiveRates'}
+        resp = scraper.post('https://www.orientexchange.in/live_exchange_rates', data=data)
+        
+        if resp.status_code != 200:
+            return JSONResponse(content={"error": f"Failed to fetch rates, status code {resp.status_code}"}, status_code=resp.status_code)
+        jsondata  = json.loads(resp.text)
+        final_data = map_rate_card_to_oreichange(jsondata)
+        return final_data
+    except:
+        return JSONResponse(content={"error": f"Failed to fetch rates, status code {resp.status_code}"}, status_code=resp.status_code)
