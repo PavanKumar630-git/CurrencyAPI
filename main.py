@@ -130,21 +130,54 @@ def map_rate_card_to_oreichange(data):
                 "platform": "orientexchange",
                 "currencycode": currency_code,
                 "currencyname": currency_name,
-                "moduletype": "buy",
-                "productname": "",
+                "moduletype": "Customer Sell Currency",
+                "productname": "Customer Sell Currency",
                 "roe": item.get('buy')
             })
         
         # Sell entry using 'scn'
-        if item.get("buy"):
+        if item.get("tcsell"):
             mapped_data.append({
                 "platform": "orientexchange",
                 "currencycode": currency_code,
                 "currencyname": currency_name,
-                "moduletype": "sell",
-                "productname": "",
-                "roe": item.get('sell')
+                "moduletype": "Customer Buy - Card",
+                "productname": "Card",
+                "roe": item.get('tcsell',0)
             })
+        # Sell entry using 'scn'
+        if item.get("cnsell"):
+            mapped_data.append({
+                "platform": "orientexchange",
+                "currencycode": currency_code,
+                "currencyname": currency_name,
+                "moduletype": "Customer Buy - Currency",
+                "productname": "Currency",
+                "roe": item.get('cnsell',0)
+            })
+
+        # Sell entry using 'scn'
+        if item.get("adtwo"):
+            mapped_data.append({
+                "platform": "orientexchange",
+                "currencycode": currency_code,
+                "currencyname": currency_name,
+                "moduletype": "Outward Remittance-Educational/Medical",
+                "productname": "Educational/Medical",
+                "roe": item.get('adtwo',0)
+            })
+
+        # Sell entry using 'scn'
+        if item.get("adone"):
+            mapped_data.append({
+                "platform": "orientexchange",
+                "currencycode": currency_code,
+                "currencyname": currency_name,
+                "moduletype": "Outward Remittance-Maintenance /Gift",
+                "productname": "Maintenance /Gift",
+                "roe": item.get('adone',0)
+            })
+    
     
     return mapped_data
 
