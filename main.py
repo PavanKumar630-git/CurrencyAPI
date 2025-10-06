@@ -6,8 +6,63 @@ import json
 
 app = FastAPI(title="Thomas Cook RateCards Proxy API")
 
+from datetime import datetime, timedelta, timezone
+
+def get_current_time_in_utc_and_ist():
+    """
+    Returns the current UTC and IST time in human-readable format,
+    along with the Unix timestamps (seconds and milliseconds).
+    """
+    # Current UTC time
+    dt_utc = datetime.now(timezone.utc)
+
+    # IST = UTC + 5:30
+    ist_offset = timedelta(hours=5, minutes=30)
+    dt_ist = dt_utc + ist_offset
+
+    # Convert to Unix timestamps
+    unix_sec = int(dt_utc.timestamp())
+    unix_ms = int(dt_utc.timestamp() * 1000)
+
+    return {
+        "utc": dt_utc.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC",
+        "ist": dt_ist.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " IST",
+        "timestamp_seconds": unix_sec,
+        "timestamp_milliseconds": unix_ms
+    }
+
+def get_thomascook_cookies():
+    """
+    Fetches cookies 'c2Vzc2lvbklk' and 'requestId' from Thomas Cook Forex Rate Card page.
+    Returns a dict like:
+        {
+            "c2Vzc2lvbklk": "...",
+            "requestId": "..."
+        }
+    """
+    url = "https://www.thomascook.in/foreign-exchange/forex-rate-card"
+    target_cookies = ["c2Vzc2lvbklk", "requestId"]
+
+    with requests.Session() as s:
+        s.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        })
+        resp = s.get(url, timeout=20)
+        resp.raise_for_status()
+
+        all_cookies = s.cookies.get_dict()
+
+        # Return only the required cookies
+        result = {name: all_cookies.get(name) for name in target_cookies}
+        return result
+
 @app.get("/thomascook")
 def get_ratecards():
+    cookies = get_thomascook_cookies()
     headers = {
         'sec-ch-ua-platform': '"Windows"',
         'Referer': 'https://www.thomascook.in/',
@@ -15,15 +70,15 @@ def get_ratecards():
         'sec-ch-ua-mobile': '?0',
         'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
         'Access-Control-Allow-Origin': '*',
-        'requestId': 'zG9X6Nb4q3',
+        'requestId': cookies.get('requestId',''),
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
         'Accept': 'application/json; charset=utf-8',
         'Content-Type': 'application/json; charset=utf-8',
-        'sessionId': 'FX4A3VfSzn581897330',
+        'sessionId': cookies.get('c2Vzc2lvbklk',''),
     }
-
+    result = get_current_time_in_utc_and_ist()
     params = {
-        '_': '1758961760117',
+        '_': result["timestamp_milliseconds"]
     }
 
     try:
